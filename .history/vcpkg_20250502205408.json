@@ -1,0 +1,21 @@
+{
+  "name": "almpose-env",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "eigen3",
+    {
+      "name": "opencv4",
+      "features": ["contrib"]
+    },
+    "boost-program-options",
+    "boost-system",
+    "boost-timer",
+    "boost-filesystem",
+    "yaml-cpp", 
+    "glew",
+    "glfw3",
+    "boost-thread",
+    "readerwriterqueue",
+    "protobuf"
+  ]
+}

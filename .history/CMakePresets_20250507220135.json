@@ -1,0 +1,65 @@
+{
+  "version": 3, 
+  "cmakeMinimumRequired": { 
+    "major": 3,
+    "minor": 23, 
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "win-msvc-vcpkg-release", 
+      "displayName": "MSVC 2022 + vcpkg (Release)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build_release", 
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_STANDARD": "20", 
+        "CMAKE_CXX_EXTENSIONS": "OFF",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows",
+        "MetavisionSDK_DIR": "$env{MetavisionSDK_DIR}",
+        "MetavisionHAL_DIR": "$env{MetavisionHAL_DIR}",
+        "ENABLE_ROS": "OFF"
+        
+      },
+      "condition": { 
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "win-msvc-vcpkg-debug", 
+      "displayName": "MSVC 2022 + vcpkg (Debug)",
+      "inherits": "win-msvc-vcpkg-release", 
+      "binaryDir": "${sourceDir}/build_debug", 
+      "cacheVariables": {
+        
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+  
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-release", // 原来的 Release 构建预设
+      "configurePreset": "win-msvc-vcpkg-release",
+      "configuration": "Release" // Ninja通常忽略这个，但保持一致性是好的
+      // targets: [ "active_markers" ] // 可以指定构建特定目标
+    },
+    {
+      "name": "build-debug", // 新的 Debug 构建预设
+      "configurePreset": "win-msvc-vcpkg-debug",
+      "configuration": "Debug"
+      // targets: [ "active_markers" ]
+    }
+  ],
+  "testPresets": [ // 如果您有测试，也可以添加测试预设
+    {
+        "name": "test-debug",
+        "configurePreset": "win-msvc-vcpkg-debug",
+        "output": {"outputOnFailure": true},
+        "configuration": "Debug"
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "version": 3, 
+  "cmakeMinimumRequired": { 
+    "major": 3,
+    "minor": 23, 
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "win-msvc-vcpkg-release", 
+      "displayName": "MSVC 2022 + vcpkg (Release)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build_release", 
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_STANDARD": "20", 
+        "CMAKE_CXX_EXTENSIONS": "OFF",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows",
+        "CELEX_SDK_ROOT": "$env{CELEX_SDK_ROOT}"
+        "MetavisionSDK_DIR": "$env{MetavisionSDK_DIR}",
+        "MetavisionHAL_DIR": "$env{MetavisionHAL_DIR}",
+        "ENABLE_ROS": "OFF"
+        
+      },
+      "condition": { 
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "win-msvc-vcpkg-debug", 
+      "displayName": "MSVC 2022 + vcpkg (Debug)",
+      "inherits": "win-msvc-vcpkg-release", 
+      "binaryDir": "${sourceDir}/build_debug", 
+      "cacheVariables": {
+        
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+  
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-release", 
+      "configurePreset": "win-msvc-vcpkg-release",
+      "configuration": "Release" 
+    
+    },
+    {
+      "name": "build-debug", 
+      "configurePreset": "win-msvc-vcpkg-debug",
+      "configuration": "Debug"
+   
+    }
+  ],
+  "testPresets": [ 
+    {
+        "name": "test-debug",
+        "configurePreset": "win-msvc-vcpkg-debug",
+        "output": {"outputOnFailure": true},
+        "configuration": "Debug"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+cmake_minimum_required(VERSION 3.24)
+project(active_markers LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# We will find each Boost component as a separate package.
+# Vcpkg should provide the necessary <package_name>-config.cmake files.
+# Ensure these names match what vcpkg provides in its 'share' directory.
+# Common names are boost_<component> or just <component> if it's a standalone library.
+# Given your vcpkg.json, the direct names are likely correct.
+set(CELEX_ROOT "D:/00/Event/Event_code/CeleX5-MIPI-master/Sources/CeleX")
+if(USE_CELEX)
+  # 根据你本地路径改
+  set(CELEX5_SDK_ROOT "D:/00/Event/Event_code/CeleX5-MIPI-master/Sources/CeleX")
+  set(CELEX5_INCLUDE_DIR "${CELEX5_SDK_ROOT}/include")
+  set(CELEX5_LIBRARY_DIR "${CELEX5_SDK_ROOT}/build/Windows_x64/release")
+  set(CELEX5_LIBRARY    "${CELEX5_LIBRARY_DIR}/CeleX.lib")
+
+  message(STATUS "→ Using CeleX SDK in ${CELEX5_SDK_ROOT}")
+  include_directories(${CELEX5_INCLUDE_DIR})
+  link_directories(${CELEX5_LIBRARY_DIR})
+  add_definitions(-DUSE_CELEX)
+endif()
+
+
+find_package(boost_program_options CONFIG REQUIRED)
+find_package(boost_system CONFIG REQUIRED)
+find_package(boost_filesystem CONFIG REQUIRED)
+find_package(boost_thread CONFIG REQUIRED)
+find_package(boost_timer CONFIG REQUIRED)
+find_package(Protobuf            CONFIG   REQUIRED)   # vcpkg 安装的 29.x
+find_package(OpenCV 4            REQUIRED COMPONENTS core imgproc highgui calib3d aruco)
+find_package(Eigen3              REQUIRED NO_MODULE)
+find_package(yaml-cpp            CONFIG   REQUIRED)
+find_package(glfw3               CONFIG   REQUIRED)
+find_package(MetavisionSDK       CONFIG   REQUIRED COMPONENTS core driver ui)
+
+# ---------- 可执行文件 ----------
+add_executable(active_markers
+    main.cpp
+    src/camera.cpp
+    src/event_reader.cpp
+    src/utils/options.cpp
+    src/utils/buffers.cpp
+    src/utils/visualization.cpp
+    src/detection_algorithm.cpp
+    src/tracker.cpp
+    src/markers.cpp
+    src/runtime_manager.cpp
+    src/logger_no_ros.cpp
+)
+
+# ---------- 头文件搜索路径 ----------
+target_include_directories(active_markers PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# Windows 防止 <windows.h> 定义 min/max 宏
+target_compile_definitions(active_markers PRIVATE NOMINMAX)
+
+# ---------- 链接 ----------
+target_link_libraries(active_markers PRIVATE
+    $<$<BOOL:${USE_CELEX}>:CeleX> 
+    ${OpenCV_LIBS}
+    yaml-cpp::yaml-cpp
+    MetavisionSDK::core
+    MetavisionSDK::driver
+    MetavisionSDK::ui
+    # boost_program_options
+    # boost_filesystem
+    # boost_system
+    # boost_thread
+    # boost_timer
+    Boost::program_options # These should still work
+    Boost::filesystem
+    Boost::system
+    Boost::thread
+    Boost::timer
+    protobuf::libprotobuf       # vcpkg 提供的目标
+    glfw
+)

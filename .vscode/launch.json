@@ -1,0 +1,26 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(Windows) Launch active_markers",
+            "type": "cppvsdbg", // 使用 Visual Studio Debugger
+            "request": "launch",
+            "program": "${workspaceFolder}/build_debug/active_markers.exe", // 可执行文件路径
+            "args": [ // 命令行参数
+                "-c", "../configs/camera/gen4_camera.yaml",
+                "-m", "../configs/markers/default.yaml",
+                "-i", "../data/Accuracy_recording.raw", // 确保文件名正确
+                "--csv"
+            ],
+            "stopAtEntry": false, // 是否在main函数入口处自动暂停
+            "cwd": "${workspaceFolder}/build_debug", // 设置当前工作目录
+            "environment": [],
+            "console": "integratedTerminal", // 或 "externalTerminal"
+            // "preLaunchTask": "CMake: build (debug)" // 可选：在启动前自动构建 (需要配置tasks.json)
+        }
+
+    ]
+}

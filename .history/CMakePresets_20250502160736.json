@@ -1,0 +1,27 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "win-msvc-vcpkg",
+      "displayName": "MSVC 2022 + vcpkg (Release)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "OpenCV_DIR": "$env{OPENCV_DIR}",
+        "MetavisionSDK_DIR": "$env{MetavisionSDK_DIR}",
+        "MetavisionHAL_DIR": "D:/Meta_SDK/Prophesee/share/cmake/MetavisionHAL",
+        "ENABLE_ROS": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "win-msvc-vcpkg-build",
+      "configurePreset": "win-msvc-vcpkg",
+      "configuration": "Release"
+    }
+  ]
+}

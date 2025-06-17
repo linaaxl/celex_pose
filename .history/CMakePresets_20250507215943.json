@@ -1,0 +1,71 @@
+{
+  "version": 3, // 或者根据您的 CMake 版本支持，可以是 4、5、6 等
+  "cmakeMinimumRequired": { // 可选，但推荐，指明支持此预设的最低CMake版本
+    "major": 3,
+    "minor": 23, // 支持 configurePresets version 3 及更高版本
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "win-msvc-vcpkg-release", // 原来的 Release 配置，重命名以区分
+      "displayName": "MSVC 2022 + vcpkg (Release)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build_release", // 修改构建目录
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_STANDARD": "20", // 确保C++标准设置
+        "CMAKE_CXX_EXTENSIONS": "OFF",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows",
+        "MetavisionSDK_DIR": "$env{MetavisionSDK_DIR}",
+        "MetavisionHAL_DIR": "$env{MetavisionHAL_DIR}",
+        "ENABLE_ROS": "OFF"
+        // 对于 Release，可以添加优化相关的编译器标志，但通常 CMAKE_BUILD_TYPE 就够了
+      },
+      "condition": { // 可选，但良好实践，确保此预设只在Windows上可选
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "win-msvc-vcpkg-debug", // 新的 Debug 配置
+      "displayName": "MSVC 2022 + vcpkg (Debug)",
+      "inherits": "win-msvc-vcpkg-release", // 可以继承 Release 的大部分通用设置
+      "binaryDir": "${sourceDir}/build_debug", // 为 Debug 设置独立的构建目录
+      "cacheVariables": {
+        // CMAKE_BUILD_TYPE 会覆盖继承来的设置
+        "CMAKE_BUILD_TYPE": "Debug",
+        // 为 Debug 模式可以添加特定的编译器标志，例如：
+        // CMAKE_CXX_FLAGS_DEBUG: "/Od /Zi /RTC1", // /Od: 禁用优化, /Zi: 调试信息, /RTC1: 运行时基本检查
+        // CMAKE_C_FLAGS_DEBUG: "/Od /Zi /RTC1"
+        // 注意：vcpkg 的 Debug triplet (x64-windows) 通常也会链接Debug版本的库，
+        // CMAKE_BUILD_TYPE=Debug 已经会传递很多默认的Debug标志给编译器。
+        // CMAKE_CXX_STANDARD, CMAKE_TOOLCHAIN_FILE 等都从 'win-msvc-vcpkg-release' 继承而来
+      }
+      // condition 也被继承了
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-release", // 原来的 Release 构建预设
+      "configurePreset": "win-msvc-vcpkg-release",
+      "configuration": "Release" // Ninja通常忽略这个，但保持一致性是好的
+      // targets: [ "active_markers" ] // 可以指定构建特定目标
+    },
+    {
+      "name": "build-debug", // 新的 Debug 构建预设
+      "configurePreset": "win-msvc-vcpkg-debug",
+      "configuration": "Debug"
+      // targets: [ "active_markers" ]
+    }
+  ],
+  "testPresets": [ // 如果您有测试，也可以添加测试预设
+    {
+        "name": "test-debug",
+        "configurePreset": "win-msvc-vcpkg-debug",
+        "output": {"outputOnFailure": true},
+        "configuration": "Debug"
+    }
+  ]
+}

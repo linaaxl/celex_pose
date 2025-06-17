@@ -1,0 +1,10 @@
+{
+    "name": "almpose-env",
+    "version-string": "0.1",
+    "dependencies": [
+      "eigen3",
+      "opencv4[core,highgui]",
+      { "name": "boost-program-options", "version>=": "1.78" }
+    ]
+  }
+  

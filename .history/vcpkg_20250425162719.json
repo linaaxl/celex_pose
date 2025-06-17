@@ -1,0 +1,14 @@
+{
+  "name": "almpose-env",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "eigen3",
+    {
+      "name": "opencv4",
+      "features": ["highgui"]
+    },
+    "boost-program-options",
+    "boost-timer",
+    "boost-filesystem"
+  ]
+}

@@ -1,0 +1,342 @@
+#include "markers.hpp"
+#include "camera.hpp" 
+MarkersManager::MarkersManager(Utils::Options::MarkersSetup setup, Camera *cam) {
+    config = setup;
+    cam_obj = cam;
+}
+
+std::vector<std::shared_ptr<Marker>> MarkersManager::matchMarkers(std::vector<double> frequencies,
+                                                 std::vector<std::vector<cv::Point>> filtered_contours,
+                                                 long long detection_time)
+{
+    std::vector<std::pair<std::vector<int>, int>> output;
+    std::vector<int> matches(frequencies.size(), 0);
+//    std::vector<Marker> detected_markers;
+    std::vector<std::shared_ptr<Marker>> detected_markers;
+
+    for (unsigned int i = 0; i < config.ids.size(); ++i){
+        std::vector<int> assigned(config.frequencies[i].size(), -1);
+        std::vector<std::vector<cv::Point>> assigned_contours(config.frequencies[i].size());
+        std::vector<int> assigned_frequencies(config.frequencies[i].size(), -1);
+        bool not_found = false;
+
+        // for (auto freq : frequencies){
+        //     std::cout << freq << " ";
+        // }
+        // std::cout << std::endl;    
+
+        for (unsigned int j = 0; j < config.frequencies[i].size(); ++j){
+            // find frequency in the list of frequencies if the distance is less than 20 Hz
+            // write functions which will return the index of the frequency in the list if the distance between query and object is below threshold
+
+            //auto it = std::find(frequencies.begin(), frequencies.end(), config.frequencies[i][j]);
+
+            auto it = std::find_if(frequencies.begin(), frequencies.end(), [&](int freq){
+                return abs(freq - config.frequencies[i][j]) < 25;
+            }); 
+            if (it != frequencies.end())
+            {
+                int index = it - frequencies.begin();
+                assigned[j] = index;
+            }
+            else{
+                // std::cout << "not found" << config.frequencies[i][j] << std::endl;
+                not_found = true;
+                break;
+            }
+        }
+
+        if (!not_found){
+            output.push_back(std::make_pair(assigned, i));
+            for (unsigned int j = 0; j<assigned.size(); ++j){
+                assigned_contours[j] = filtered_contours[assigned[j]];
+                assigned_frequencies[j] = frequencies[assigned[j]];
+            }
+
+        
+
+            detected_markers.push_back(std::make_shared<Marker>(config.ids[i],
+                                                                config.coordinates[i],
+                                                                assigned_contours,
+                                                                assigned_frequencies,
+                                                                detection_time,
+                                                                this->cam_obj,
+                                                                logger_ptr,
+                                                                this));
+        }
+    }
+    return detected_markers;
+}
+
+void MarkersManager::registerDetections(std::vector<double> frequencies,
+                                        std::vector<std::vector<cv::Point>> filtered_contours,
+                                        long long int detection_timestamp) {
+    auto detected_markers = matchMarkers(frequencies, filtered_contours, detection_timestamp);
+
+    tracked_markers_ids_mutex.lock();
+    for (auto &marker : detected_markers){
+//        std::cout << tracked_markers_ids.size() << std::endl;
+        auto it = std::find(tracked_markers_ids.begin(), tracked_markers_ids.end(), marker->id);
+        if (it != tracked_markers_ids.end()) {
+
+        }
+        else{
+            tracked_markers_ids.push_back(marker->id);
+            markers_to_spawn.push_back(marker);
+        }
+    }
+    tracked_markers_ids_mutex.unlock();
+};
+
+void MarkersManager::deregisterMarker(Marker *marker_to_remove) {
+    tracked_markers_ids_mutex.lock();
+    auto it = std::find(tracked_markers_ids.begin(), tracked_markers_ids.end(), marker_to_remove->id);
+    if (it != tracked_markers_ids.end()) {
+        tracked_markers_ids.erase(it);
+    }
+    tracked_markers_ids_mutex.unlock();
+    tracked_markers_mutex.lock();
+    for(size_t i = 0; i < tracked_markers.size(); i++){
+        if (tracked_markers[i].get() == marker_to_remove){
+            markers_to_destroy.push_back(tracked_markers[i]);
+            tracked_markers_mutex.unlock();
+            break;
+        }
+    }
+}
+
+void MarkersManager::spawnMarkers(std::shared_ptr<Deque> deque, Buffers *input_buffers){
+    tracked_markers_mutex.lock();
+
+    for (auto &marker : markers_to_destroy){
+        auto it = std::find(tracked_markers.begin(), tracked_markers.end(), marker);
+        if (it != tracked_markers.end()) {
+            tracked_markers.erase(it);
+        }
+    }
+    markers_to_destroy.clear();
+    for (auto &marker : markers_to_spawn){
+
+        tracked_markers.push_back(marker);
+        tracked_markers.back()->startTracking(deque, input_buffers);
+    }
+    tracked_markers_mutex.unlock();
+    markers_to_spawn.clear();
+
+}
+
+std::shared_ptr<OutputEntry> Marker::getOutput(bool detection = false) {
+    current_output = std::make_shared<OutputEntry>();
+    current_output->id = id;
+    current_output->camera_timestamp = current_camera_timestamp;
+    current_output->pc_timestamp = current_pc_timestamp;
+    current_output->detection = detection;
+    current_output->pose_trans.x = t_vec.at<double>(0);
+    current_output->pose_trans.y = t_vec.at<double>(1);
+    current_output->pose_trans.z = t_vec.at<double>(2);
+    current_output->pose_rot.r_0 = r_vec.at<double>(0);
+    current_output->pose_rot.r_1 = r_vec.at<double>(1);
+    current_output->pose_rot.r_2 = r_vec.at<double>(2);
+
+    return current_output;
+}
+
+
+void Marker::startTracking(std::shared_ptr<Deque> deque, Buffers *input_buffers) {
+    initial_buffer = deque;
+    input_buffers_ptr = input_buffers;
+    buffers.setInputBuffer(input_buffers_ptr->getOutputBuffer());
+    tracking_thread = std::make_shared<std::jthread>(&Marker::track, this);
+}
+
+void Marker::stopTracking(){
+    input_buffers_ptr->deregisterBuffer(buffers.getInputBuffer());
+}
+
+void Marker::track() {
+
+}
+
+void Marker::track() {
+    try {
+        std::cout << "[Marker ID: " << id << " THREAD_TRACK] Started." << std::endl << std::flush;
+        // ... 您现有的 track() 逻辑，包括初始PnP和主循环 ...
+        std::cout << "[Marker ID: " << id << " THREAD_TRACK] Exiting normally. tracking_lost=" << tracking_lost.load() << std::endl << std::flush;
+    } catch (const cv::Exception& cv_e) { // 先捕获更具体的OpenCV异常
+        std::cerr << "[Marker ID: " << id << " THREAD_TRACK] OpenCV Exception: " << cv_e.what()
+                  << " (File: " << cv_e.file << ", Line: " << cv_e.line << ", Func: " << cv_e.func << ")" << std::endl << std::flush;
+    } catch (const std::exception& e) { // 再捕获标准异常
+        std::cerr << "[Marker ID: " << id << " THREAD_TRACK] Std Exception: " << e.what() << std::endl << std::flush;
+    } catch (...) { // 最后捕获所有其他未知类型
+        std::cerr << "[Marker ID: " << id << " THREAD_TRACK] Unknown exception in track thread." << std::endl << std::flush;
+    }
+    // 确保线程退出前清理状态并通知管理器
+    tracking_lost = true; // 如果因异常退出，应标记为丢失
+    if (current_pnp_thread.joinable()) { // 确保PnP子线程已结束
+        current_pnp_thread.join();
+    }
+    stopTracking(); // 清理此Marker的buffer等
+    markers_manager_ptr->deregisterMarker(this); // 从管理器中注销
+    std::cout << "[Marker ID: " << id << " THREAD_TRACK] Fully exited after cleanup." << std::endl << std::flush;
+}
+
+Marker::Marker(int idx,
+               std::vector<cv::Point3d> points_3d,
+               std::vector<std::vector<cv::Point>> contours,
+               std::vector<int> frequencies,
+               long long detection_time,
+               Camera *cam,std::shared_ptr<Logger> logger,
+               MarkersManager *markers_manager)
+{
+    markers_manager_ptr = markers_manager;
+    logger_ptr = logger;
+    detected_at = detection_time;
+    current_camera_timestamp = detection_time;
+
+    blob_frequencies = frequencies;
+    auto now_ms = std::chrono::system_clock::now();
+    auto epoch = now_ms.time_since_epoch();
+    auto value = std::chrono::duration_cast<std::chrono::microseconds>(epoch);
+
+    current_pc_timestamp = value.count();
+
+
+    id = idx;
+    std::vector<cv::Point2d> centers;
+    for (unsigned int i=0; i<contours.size(); i++){
+        cv::Moments M = cv::moments(contours[i]);
+        cv::Point2f center(M.m10/M.m00, M.m01/M.m00);
+        centers.push_back(center);
+    }
+    objectpoints_3d = points_3d;
+    detected_initial_points = centers;
+
+    cam_obj = cam;
+
+}
+
+void Marker::solvePnP() {
+    std::vector<cv::Point2d> blob_centers;
+    std::vector<double> distances;
+
+    // 填充 blob_centers 和 distances (假设这部分逻辑正确)
+    for (auto blob_out : blobs_for_current_pnp){ // 使用不同的变量名避免歧义
+        blob_centers.emplace_back(cv::Point2d(blob_out.x, blob_out.y));
+    }
+    for (auto distance : average_distances){
+        distances.push_back(distance);
+    }
+
+    std::cout << "[Marker ID: " << id << " SOLVE_PNP] Attempting PnP. "
+              << "Object points count: " << objectpoints_3d.size()
+              << ", Image points (blob_centers) count: " << blob_centers.size()
+              << std::endl << std::flush;
+
+    bool pnp_call_success = false; // 用于接收 solvePnP 的返回值
+    if (objectpoints_3d.size() == blob_centers.size() && objectpoints_3d.size() >= 3) {
+        // 使用类成员 solve_method (已设为 SOLVEPNP_SQPNP)
+        // 在跟踪循环中，useExtrinsicGuess 可以为 true，使用上一帧的 r_vec, t_vec 作为初始值
+        // 但要确保 r_vec 和 t_vec 在第一次调用或丢失跟踪后是合理的，或者在这些情况下设为false
+        bool use_guess = !r_vec.empty() && !t_vec.empty(); // 简单的检查，可以更复杂
+
+        pnp_call_success = cv::solvePnP(objectpoints_3d,
+                                        blob_centers,
+                                        this->cam_obj->camera_matrix_cv,
+                                        this->cam_obj->dist_coeffs,
+                                        r_vec, // 输出参数
+                                        t_vec, // 输出参数
+                                        use_guess, // 根据情况设置
+                                        solve_method);
+
+        if (pnp_call_success) {
+            std::cout << "[Marker ID: " << id << " SOLVE_PNP] PnP call Succeeded." << std::endl << std::flush;
+        } else {
+            std::cerr << "[Marker ID: " << id << " SOLVE_PNP] PnP call FAILED by solvePnP function." << std::endl << std::flush;
+        }
+    } else {
+        std::cerr << "[Marker ID: " << id << " SOLVE_PNP] Insufficient or mismatched points for PnP. "
+                  << "Object points: " << objectpoints_3d.size()
+                  << ", Detected 2D points: " << blob_centers.size()
+                  << ". Skipping PnP." << std::endl << std::flush;
+        pnp_call_success = false; // 明确标记失败
+    }
+
+    if (!pnp_call_success) {
+        tracking_lost = true; // 如果PnP失败，标记跟踪丢失
+        pnp_running = false;  // 重置 PnP 运行状态
+        new_result = false;
+        return; // 从 solvePnP 返回
+    }
+
+    // 只有当 PnP 成功时才继续后续操作
+    cv::Mat projected_tmp;
+    cv::projectPoints(objectpoints_3d, r_vec, t_vec, this->cam_obj->camera_matrix_cv, this->cam_obj->dist_coeffs, projected_tmp);
+
+    projected_objectpoints.clear(); // 清空之前的点
+    if (!projected_tmp.empty()) {
+        // projected_tmp 通常是 Nx1 的 Mat，其中每个元素是 2 通道 (Point2f或Point2d)
+        // 或者 N_rows x 2_cols 的 Mat，每行是一个点，类型是 CV_32F 或 CV_64F
+        // 具体取决于 projectPoints 的输出。通常是 Nx1 CV_32FC2 或 Nx1 CV_64FC2。
+
+        // 假设 projected_tmp 是 Nx1，类型为 CV_64FC2 (cv::Point2d)
+        if (projected_tmp.type() == CV_64FC2 && projected_tmp.cols == 1) {
+            for (int i = 0; i < projected_tmp.rows; ++i) {
+                projected_objectpoints.push_back(projected_tmp.at<cv::Point2d>(i, 0));
+            }
+        } 
+        // 假设 projected_tmp 是 Nx1，类型为 CV_32FC2 (cv::Point2f)
+        else if (projected_tmp.type() == CV_32FC2 && projected_tmp.cols == 1) {
+            for (int i = 0; i < projected_tmp.rows; ++i) {
+                projected_objectpoints.push_back(projected_tmp.at<cv::Point2f>(i, 0)); // 会自动转换为 Point2d
+            }
+        } else {
+            std::cerr << "[Marker ID: " << id << " SOLVE_PNP] projected_tmp has unexpected format. Type: " 
+                    << projected_tmp.type() << " Rows: " << projected_tmp.rows 
+                    << " Cols: " << projected_tmp.cols << std::endl << std::flush;
+            // 这里可能需要设置 tracking_lost = true; 因为重投影点无法正确获取
+        }
+    } else {
+        std::cerr << "[Marker ID: " << id << " SOLVE_PNP] projected_tmp is empty after projectPoints." << std::endl << std::flush;
+        // 这里也可能需要设置 tracking_lost = true;
+    }
+
+    double error_sum = 0.;
+    double dist_sum = 0.;
+    // 确保 projected_objectpoints 和 blob_centers 大小一致
+    if (projected_objectpoints.size() == blob_centers.size() && !blob_centers.empty()) {
+        for (size_t i = 0; i < blob_centers.size() ; i++) {
+            error_sum += cv::norm(projected_objectpoints[i] - blob_centers[i]);
+            if (i < distances.size()) { // 确保 distances 也有足够的元素
+                 dist_sum += (2 * distances[i]);
+            } else {
+                 std::cerr << "[Marker ID: " << id << " SOLVE_PNP] Distances vector too small." << std::endl << std::flush;
+                 // 可能需要处理这个错误
+            }
+        }
+        std::cout << "[Marker ID: " << id << " SOLVE_PNP] Reprojection error sum: " << error_sum 
+                  << ", Distance sum for threshold: " << dist_sum << std::endl << std::flush;
+        if(error_sum > dist_sum && !blob_centers.empty()){ // 仅当有blob时才比较
+            std::cout << "[Marker ID: " << id << " SOLVE_PNP] Tracking lost due to high reprojection error." << std::endl << std::flush;
+            tracking_lost = true;
+        }
+    } else {
+        std::cerr << "[Marker ID: " << id << " SOLVE_PNP] Mismatch or empty projected_objectpoints/blob_centers for error calculation." << std::endl << std::flush;
+        if (!blob_centers.empty()) { // 如果只是大小不匹配但有blobs，可能也算丢失
+            tracking_lost = true;
+        }
+    }
+
+
+    auto now_ms = std::chrono::system_clock::now();
+    auto epoch = now_ms.time_since_epoch();
+    auto value = std::chrono::duration_cast<std::chrono::microseconds>(epoch);
+    current_pc_timestamp = value.count();
+
+    // 确保 getOutput() 内部对 r_vec 和 t_vec 的访问是安全的
+    auto out = getOutput(); // getOutput 现在应该内部检查 r_vec, t_vec
+    out->tracker_outputs = blobs_for_current_pnp;
+    // logger_ptr->output_queue->enqueue(out); // 暂时注释或修改 Logger 相关代码
+
+    pnp_running = false; // PnP 计算完成
+    new_result = true;   // 有新的结果
+}

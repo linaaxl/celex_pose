@@ -1,0 +1,67 @@
+cmake_minimum_required(VERSION 3.24)
+project(active_markers LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# ---------- 可执行文件 ----------
+add_executable(active_markers
+    main.cpp
+    src/camera.cpp
+    src/event_reader.cpp
+    src/utils/options.cpp
+    src/utils/buffers.cpp
+    src/utils/visualization.cpp
+    src/detection_algorithm.cpp
+    src/tracker.cpp
+    src/markers.cpp
+    src/runtime_manager.cpp
+    src/logger_no_ros.cpp
+)
+
+# ---------- 手动配置 vcpkg 安装路径 ----------
+set(VCPKG_INSTALLED_DIR "${CMAKE_SOURCE_DIR}/build/vcpkg_installed/x64-windows")
+
+# ---------- 手动配置 Boost ----------
+target_include_directories(active_markers PRIVATE
+    "${VCPKG_INSTALLED_DIR}/include"
+)
+link_directories("${VCPKG_INSTALLED_DIR}/lib")
+set(BOOST_LIBS
+    boost_program_options-vc143-mt
+    boost_system-vc143-mt
+    boost_filesystem-vc143-mt
+    boost_thread-vc143-mt
+    boost_timer-vc143-mt
+)
+
+# ---------- 手动配置 Protobuf ----------
+target_include_directories(active_markers PRIVATE
+    "${VCPKG_INSTALLED_DIR}/include"
+)
+# link_directories already set above for Boost; protobuf libs live in same lib folder
+set(PROTOBUF_LIBS
+    libprotobuf
+    libprotobuf-lite
+)
+
+# NOMINMAX 防止 <windows.h> 宏污染
+target_compile_definitions(active_markers PRIVATE NOMINMAX)
+
+# ---------- 其它依赖（CMake 包） ----------
+find_package(OpenCV 4 REQUIRED COMPONENTS core imgproc highgui calib3d aruco)
+find_package(Eigen3         REQUIRED NO_MODULE)
+find_package(yaml-cpp       CONFIG   REQUIRED)
+find_package(glfw3          CONFIG   REQUIRED)
+find_package(MetavisionSDK  CONFIG   REQUIRED COMPONENTS core driver ui)
+
+# ---------- 链接所有库 ----------
+target_link_libraries(active_markers PRIVATE
+    ${OpenCV_LIBS}
+    yaml-cpp::yaml-cpp
+    MetavisionSDK::core
+    MetavisionSDK::driver
+    MetavisionSDK::ui
+    ${BOOST_LIBS}
+    ${PROTOBUF_LIBS}
+    glfw
+)

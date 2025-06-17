@@ -1,0 +1,115 @@
+cmake_minimum_required(VERSION 3.21)
+project(almpose_app LANGUAGES CXX)
+
+# --- C++ Standard Configuration ---
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(MSVC)
+    # Ensures __cplusplus macro is correct for C++20 and enables stricter conformance
+    add_compile_options(/Zc:__cplusplus /permissive-)
+    # Disable specific warnings if necessary, e.g., for external headers
+    # add_compile_options(/W4 /wd4244 /wd4267) # [22]
+    # add_definitions(-D_USE_MATH_DEFINES) # If math constants like M_PI are needed from <cmath>
+endif()
+
+# --- Find Dependencies ---
+# Boost
+# The original error was related to finding boost_program_options 1.88.0.
+# The correct way to find Boost components with standard FindBoost.cmake is to use underscores.
+# vcpkg ensures that the 'boost-program-options' package provides the necessary targets.
+find_package(Boost 1.88.0 REQUIRED COMPONENTS program_options)
+if(Boost_FOUND)
+    message(STATUS "Found Boost ${Boost_VERSION_STRING}")
+    message(STATUS "Boost include_dirs: ${Boost_INCLUDE_DIRS}")
+    message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
+    message(STATUS "Boost program_options library: ${Boost_PROGRAM_OPTIONS_LIBRARY}") # Check specific component variable
+else()
+    message(FATAL_ERROR "Boost version 1.88.0 with program_options component not found.")
+endif()
+
+# Eigen3
+find_package(Eigen3 3.4.0 REQUIRED)
+if(Eigen3_FOUND)
+    message(STATUS "Found Eigen3 ${Eigen3_VERSION_STRING}")
+else()
+    message(FATAL_ERROR "Eigen3 version 3.4.0 not found.")
+endif()
+
+# OpenCV 4
+# Components should align with features specified in vcpkg.json
+find_package(OpenCV 4.8.0 REQUIRED COMPONENTS core imgproc highgui calib3d)
+if(OpenCV_FOUND)
+    message(STATUS "Found OpenCV ${OpenCV_VERSION}")
+else()
+    message(FATAL_ERROR "OpenCV version 4.8.0 not found.")
+endif()
+
+# MetavisionSDK / OpenEB
+# This assumes MetavisionSDK/OpenEB has been built and installed to a location
+# findable by CMake (e.g., CMAKE_PREFIX_PATH is set, or it's installed to a standard location).
+# The Prophesee examples use "MetavisionSDK" as the package name.[18]
+# Adjust components as needed based on your OpenEB build and project requirements.
+# Common OpenEB modules include core, hal, stream, ui.[19]
+find_package(MetavisionSDK COMPONENTS core stream ui REQUIRED)
+if(MetavisionSDK_FOUND)
+    message(STATUS "Found MetavisionSDK ${MetavisionSDK_VERSION}")
+else()
+    message(FATAL_ERROR "MetavisionSDK not found. Ensure it is built and installed correctly, and CMAKE_PREFIX_PATH is set if needed.")
+endif()
+
+# --- Add Executable ---
+add_executable(almpose_app
+    src/main.cpp
+    # Add other source files here
+)
+
+# --- Link Libraries ---
+target_link_libraries(almpose_app PRIVATE
+    # Boost
+    Boost::program_options
+
+    # Eigen3
+    Eigen3::Eigen # Standard imported target for Eigen3 [20, 21]
+
+    # OpenCV
+    # Imported targets are typically OpenCV::core, OpenCV::imgproc, etc.
+    OpenCV::core
+    OpenCV::imgproc
+    OpenCV::highgui
+    OpenCV::calib3d
+
+    # MetavisionSDK
+    # Imported targets from MetavisionSDK example [18]
+    MetavisionSDK::core
+    MetavisionSDK::stream
+    MetavisionSDK::ui
+)
+
+# --- Include Directories (Modern CMake with targets usually handles this) ---
+# target_include_directories(almpose_app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include) # If you have local includes
+
+# --- dirent.h for Windows (if used by the project) ---
+# OpenEB's CMakeLists.txt includes a workaround for dirent.h on Windows [22]
+# This is only needed if your project code directly includes <dirent.h>.
+if(WIN32 AND VCPKG_TARGET_TRIPLET MATCHES "windows")
+    find_path(DIRENT_INCLUDE_DIR dirent.h PATHS ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include NO_DEFAULT_PATH)
+    if(DIRENT_INCLUDE_DIR)
+        target_include_directories(almpose_app PRIVATE ${DIRENT_INCLUDE_DIR})
+        message(STATUS "Found dirent.h for Windows at ${DIRENT_INCLUDE_DIR}, adding to include path.")
+    else()
+        message(WARNING "dirent.h not found via vcpkg for Windows. If your code uses it, compilation may fail.")
+    endif()
+endif()
+
+# --- ROS Integration Note ---
+# The user query mentioned "Boost - (For version with ROS publisher required version > 1.78)".
+# This CMakeLists.txt is for a standard C++/CMake project using vcpkg.
+# If this project is intended to be a ROS1 or ROS2 package, this CMakeLists.txt
+# will need to be significantly adapted to use catkin_package() / ament_package()
+# and other ROS-specific CMake macros.[23, 24, 25, 26, 27, 28]
+# Dependencies managed by vcpkg would typically be found as system libraries
+# by the ROS build system or via custom Find<Package>.cmake files.
+# The Boost version 1.88.0 specified meets the >1.78 requirement.
+message(STATUS "ROS Integration Note: If this is a ROS project, this CMakeLists.txt needs adaptation for catkin/ament. See comments within.")

@@ -1,0 +1,12 @@
+{
+  "name": "almpose-env",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "opencv4",
+    "eigen3",
+    "spdlog",
+    "jsoncpp",
+    "glad",
+    "glfw3",
+    "glm",
+}

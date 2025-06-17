@@ -1,0 +1,33 @@
+cmake_minimum_required(VERSION 3.5)
+project(active_markers LANGUAGES CXX)
+
+# C++ 标准和优化选项
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast")
+
+# ———————— SDK 路径配置 ————————
+# 强制用户在命令行中指定 SDK 根目录
+if(NOT DEFINED MetavisionSDK_DIR)
+  message(FATAL_ERROR
+    "请在 cmake 命令中加上 -DMetavisionSDK_DIR=<你的SDK>/share/cmake/MetavisionSDK")
+endif()
+
+# 自动定位 MetavisionHALConfig.cmake 所在目录
+if(NOT DEFINED MetavisionHAL_DIR)
+  set(MetavisionHAL_DIR
+      "${MetavisionSDK_DIR}/../MetavisionHAL"
+      CACHE PATH "Path to MetavisionHALConfig.cmake")
+  message(STATUS "Auto-set MetavisionHAL_DIR=${MetavisionHAL_DIR}")
+endif()
+
+# ———————— 查找 SDK 组件 ————————
+find_package(MetavisionSDK CONFIG REQUIRED COMPONENTS core driver ui)
+find_package(Boost    REQUIRED CONFIG COMPONENTS
+    program_options thread filesystem timer)
+find_package(OpenCV   4     REQUIRED COMPONENTS core imgproc highgui)
+find_package(Eigen3   3.3   REQUIRED NO_MODULE)
+find_package(yaml-cpp CONFIG REQUIRED)
+find_package(glfw3    CONFIG REQUIRED)
+
+# 后面继续你的 add_executable、include、link ……
